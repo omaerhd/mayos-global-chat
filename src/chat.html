@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>global chat test</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+
+        #chatBox {
+            background: #222;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        #chatBox p {
+            margin: 6px 0;
+        }
+
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: none;
+        }
+
+        #username {
+            width: 150px;
+        }
+
+        #message {
+            width: 300px;
+        }
+
+        button {
+            background: #00ff80;
+            color: rgb(0, 0, 0);
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #00a349;
+        }
+    </style>
+</head>
+<body>
+
+<h2>the mayo chat</h2>
+
+<div id="chatBox"></div>
+
+<input id="message" placeholder="type a message">
+<button id="sendBtn">send</button>
+<audio id="notif">
+  <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_17cba0354b.mp3" type="audio/mp3">
+</audio>
+
+<script type="module">
+
+    function getNameColor(speaker) {
+        const NAME_COLORS = [
+            "rgb(253, 41, 67)",
+            "rgb(1, 162, 255)",
+            "rgb(2, 184, 87)",
+            "rgb(180, 128, 255)",
+            "rgb(218, 133, 65)",
+            "rgb(245, 205, 48)",
+            "rgb(232, 186, 200)",
+            "rgb(215, 197, 154)"
+        ];
+
+        function getNameValue(pName) {
+            let value = 0;
+            for (let index = 0; index < pName.length; index++) {
+                let cValue = pName.charCodeAt(index);
+                let reverseIndex = pName.length - index;
+                if (pName.length % 2 === 1) {
+                    reverseIndex -= 1;
+                }
+                if (reverseIndex % 4 >= 2) {
+                    cValue = -cValue;
+                }
+                value += cValue;
+            }
+            return value;
+        }
+
+        function computeNameColor(pName) {
+            return NAME_COLORS[(getNameValue(pName) % NAME_COLORS.length)];
+        }
+
+        return computeNameColor(speaker);
+    }
+
+
+    let username = prompt("type ur username");
+    if (username == "" || username == null) {
+        username = "nameless bum";
+    } 
+
+    // Firebase imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { 
+        getFirestore, 
+        collection, 
+        addDoc, 
+        serverTimestamp,
+        query,
+        orderBy,
+        onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // Your Firebase config
+    const firebaseConfig = {
+        apiKey: "AIzaSyA1W25hGiz3fJKiRHATEIFvHL322q4lEs",
+        authDomain: "mayosglobalchat.firebaseapp.com",
+        projectId: "mayosglobalchat",
+        storageBucket: "mayosglobalchat.appspot.com",
+        messagingSenderId: "56037858428",
+        appId: "1:56037858428:web:0f4197012bc9fe124c8031"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Send a message
+    async function sendMessage(text, user) {
+        if (!text.trim()) return;
+        if (!user.trim()) return;
+
+        await addDoc(collection(db, "messages"), {
+            text,
+            user,
+            timestamp: serverTimestamp()
+        });
+    }
+
+    async function userSend() {
+        const user = username;
+        const text = document.getElementById("message").value;
+
+        sendMessage(text, user);
+        document.getElementById("message").value = "";
+    }
+
+    // Real-time listener
+	const sound = document.getElementById("notif");
+    const chatBox = document.getElementById("chatBox");
+
+    const q = query(collection(db, "messages"), orderBy("timestamp"));
+    onSnapshot(q, (snapshot) => {
+        chatBox.innerHTML = ""; // clear chat
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const p = document.createElement("p");
+            p.innerHTML = `<strong>${data.user}:</strong> ${data.text}`;
+            chatBox.appendChild(p);
+        });
+
+        chatBox.scrollTop = chatBox.scrollHeight; // auto-scroll
+		if (document.hidden) {
+			sound.play(); // plays the notification if the tab is closed
+		};
+    });
+
+    document.getElementById("sendBtn").onclick = (userSend)
+    document.addEventListener("keydown", function(event) {
+        const keyName = event.key;
+        if (keyName == "Enter") {
+            userSend();
+        }
+    });
+
+</script>
+
+</body>
+</html>
