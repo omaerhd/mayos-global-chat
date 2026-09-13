@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>global chat test</title>
+    <title></title>
 
     <style>
         body {
@@ -61,11 +61,16 @@
 
 <input id="message" placeholder="type a message">
 <button id="sendBtn">send</button>
+
+<p id="version">v0.2.1 (<a href="https://github.com/omaerhd/mayos-global-chat" target="_blank" >latest version</a>)</p>
+
 <audio id="notif">
-  <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_17cba0354b.mp3" type="audio/mp3">
+  <source src="https://cdn.pixabay.com/audio/2026/05/21/audio_9bfbf47c1f.mp3" type="audio/mp3">
 </audio>
 
 <script type="module">
+	const basetitle = "the mayo chat";
+	document.title = basetitle;
 
     function getNameColor(speaker) {
         const NAME_COLORS = [
@@ -153,10 +158,16 @@
         sendMessage(text, user);
         document.getElementById("message").value = "";
     }
+	
+	function ping() {
+		sound.currentTime = 0
+		sound.play();
+	}
 
     // Real-time listener
 	const sound = document.getElementById("notif");
     const chatBox = document.getElementById("chatBox");
+	let notifs = 0;
 
     const q = query(collection(db, "messages"), orderBy("timestamp"));
     onSnapshot(q, (snapshot) => {
@@ -171,7 +182,9 @@
 
         chatBox.scrollTop = chatBox.scrollHeight; // auto-scroll
 		if (document.hidden) {
-			sound.play(); // plays the notification if the tab is closed
+			ping(); // plays the notification if the tab is closed
+			notifs += 1
+			document.title = basetitle+" ("+notifs+")"
 		};
     });
 
@@ -182,6 +195,14 @@
             userSend();
         }
     });
+	document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState === "visible") {
+			notifs = 0;
+			document.title = basetitle;
+		} else {
+			document.title = basetitle;
+		}
+	});
 
 </script>
 
