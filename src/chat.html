@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title></title>
-	<link id="siteIcon" rel="icon" href="logo.png">
+    <link id="siteIcon" rel="icon" href="logo.png">
 
     <style>
         body {
@@ -43,6 +43,18 @@
             width: 300px;
         }
 
+        #version {
+            color:rgb(150, 150, 150)
+        }
+
+        a {
+            color: rgb(0, 162, 255)
+        }
+
+        a:hover {
+            color: rgb(0, 119, 255)
+        }
+
         button {
             background: #00ff80;
             color: rgb(0, 0, 0);
@@ -60,18 +72,19 @@
 
 <div id="chatBox"></div>
 
-<input id="message" placeholder="type a message">
+<input id="message" maxlength="200" placeholder="type a message">
 <button id="sendBtn">send</button>
 
-<p id="version">v0.2.2 (<a href="https://github.com/omaerhd/mayos-global-chat" target="_blank" >latest version</a>)</p>
+
+<p id="version">v0.3.0 (<a href="https://github.com/omaerhd/mayos-global-chat" target="_blank" >latest version</a>)</p>
 
 <audio id="notif">
   <source src="https://cdn.pixabay.com/audio/2026/05/21/audio_9bfbf47c1f.mp3" type="audio/mp3">
 </audio>
 
 <script type="module">
-	const basetitle = "the mayo chat";
-	document.title = basetitle;
+   const basetitle = "the mayo chat";
+    document.title = basetitle;
 
     function getNameColor(speaker) {
         const NAME_COLORS = [
@@ -108,42 +121,94 @@
         return computeNameColor(speaker);
     }
 
-
-    let username = prompt("type ur username");
-    if (username == "" || username == null) {
-        username = "nameless bum";
-    } 
+    let username = prompt("type ur username (20 character limit)");
+    if (!username) username = "nameless bum";
 
     // Firebase imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { 
-        getFirestore, 
-        collection, 
-        addDoc, 
+    import {
+        getFirestore,
+        collection,
+        addDoc,
         serverTimestamp,
         query,
         orderBy,
         onSnapshot
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // Your Firebase config
+    // storage import
+    import {
+        getStorage,
+        ref,
+        uploadBytes,
+        getDownloadURL
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
     const firebaseConfig = {
-        apiKey: "AIzaSyA1W25hGiz3fJKiRHATEIFvHL322q4lEs",
-        authDomain: "mayosglobalchat.firebaseapp.com",
-        projectId: "mayosglobalchat",
-        storageBucket: "mayosglobalchat.appspot.com",
-        messagingSenderId: "56037858428",
-        appId: "1:56037858428:web:0f4197012bc9fe124c8031"
+        apiKey: "AIzaSyBapAMh6dBFg0Jfovv_7-YUcYpOwq7y3v8",
+        authDomain: "the-mayo-chat.firebaseapp.com",
+        projectId: "the-mayo-chat",
+        storageBucket: "the-mayo-chat.firebasestorage.app",
+        messagingSenderId: "489578381536",
+        appId: "1:489578381536:web:ac8946e18445db2a635085"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const storage = getStorage(app);
 
-    // Send a message
+    const sound = document.getElementById("notif");
+    const chatBox = document.getElementById("chatBox");
+    const messageBox = document.getElementById("message");
+
+    let notifs = 0;
+
+    function ping() {
+        sound.currentTime = 0;
+        sound.play();
+    }
+
+
+    // Real-time listener
+    const q = query(collection(db, "messages"), orderBy("timestamp"));
+    onSnapshot(q, (snapshot) => {
+        chatBox.innerHTML = "";
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const p = document.createElement("p");
+
+            if (
+                /\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i.test(data.text) ||
+                data.text.includes("firebasestorage")
+            ) {
+                p.innerHTML = `
+                    <strong style="color:${getNameColor(data.user)}">${data.user}:</strong><br>
+                    <img src="${data.text}" style="max-width:600px; border-radius:8px;">
+                `;
+            } else {
+                p.innerHTML = `
+                    <strong style="color:${getNameColor(data.user)}">${data.user}:</strong> ${data.text}
+                `;
+            }
+
+            chatBox.appendChild(p);
+        });
+
+        //chatBox.scrollTop = chatBox.scrollHeight; (an iq too michael)
+        if ((chatBox.scrollHeight - chatBox.scrollTop) < 750) {
+            chatBox.scrollTop = chatBox.scrollHeight; //auto-scroll if near the bottom
+        }
+
+        if (document.hidden) {
+			ping(); // plays the notification if the tab is closed 
+			notifs += 1
+			document.title = basetitle+" ("+notifs+")"
+		};
+    });
+
     async function sendMessage(text, user) {
         if (!text.trim()) return;
-        if (!user.trim()) return;
 
         await addDoc(collection(db, "messages"), {
             text,
@@ -152,58 +217,47 @@
         });
     }
 
-    async function userSend() {
-        const user = username;
-        const text = document.getElementById("message").value;
+    let lastMessageTime = 0;
+    let cooldown = 500;
 
-        sendMessage(text, user);
+    function sleep(ms) {return new Promise(resolve => setTimeout(resolve, ms));}
+
+    async function extendCooldown() {
+        cooldown = 5000;
+        await sleep(10000);
+        cooldown = 500;
+    }
+
+    async function userSend() {
+        if (messageBox.value === "") return;
+
+        const now = Date.now();
+
+        if (now - lastMessageTime < cooldown) {
+            alert("YO STFU");
+            extendCooldown();
+            return;
+        }
+
+        lastMessageTime = now;
+
+        const text = document.getElementById("message").value;
+        sendMessage(text, username);
         document.getElementById("message").value = "";
     }
-	
-	function ping() {
-		sound.currentTime = 0
-		sound.play();
-	}
 
-    // Real-time listener
-	const sound = document.getElementById("notif");
-    const chatBox = document.getElementById("chatBox");
-	let notifs = 0;
+    document.getElementById("sendBtn").onclick = userSend;
 
-    const q = query(collection(db, "messages"), orderBy("timestamp"));
-    onSnapshot(q, (snapshot) => {
-        chatBox.innerHTML = ""; // clear chat
-
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const p = document.createElement("p");
-            p.innerHTML = `<strong>${data.user}:</strong> ${data.text}`;
-            chatBox.appendChild(p);
-        });
-
-        chatBox.scrollTop = chatBox.scrollHeight; // auto-scroll
-		if (document.hidden) {
-			ping(); // plays the notification if the tab is closed
-			notifs += 1
-			document.title = basetitle+" ("+notifs+")"
-		};
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") userSend();
     });
 
-    document.getElementById("sendBtn").onclick = (userSend)
-    document.addEventListener("keydown", function(event) {
-        const keyName = event.key;
-        if (keyName == "Enter") {
-            userSend();
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            notifs = 0;
+            document.title = basetitle;
         }
     });
-	document.addEventListener("visibilitychange", () => {
-		if (document.visibilityState === "visible") {
-			notifs = 0;
-			document.title = basetitle;
-		} else {
-			document.title = basetitle;
-		}
-	});
 
 </script>
 
